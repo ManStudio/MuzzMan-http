@@ -20,3 +20,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 muzzman-lib = "0.1.0" 
+rustls = "0.20.7"
+webpki = "0.22.0"
+webpki-roots = "0.22.6"

@@ -1,11 +1,8 @@
-use std::{
-    io::{Read, Write},
-    net::TcpStream,
-};
+use std::io::{Read, Write};
 
 use muzzman_lib::prelude::*;
 
-use crate::error;
+use crate::{connection::Connection, error};
 
 pub fn uploading(element: &ERow, storage: &mut Storage) {
     let mut sent = 0;
@@ -36,7 +33,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
         }
     }
 
-    if let Some(conn) = storage.get_mut::<TcpStream>() {
+    if let Some(conn) = storage.get_mut::<Connection>() {
         let _res = conn.write(&bytes[0..add]);
     } else {
         element.set_status(1);

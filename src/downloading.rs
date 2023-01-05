@@ -1,11 +1,8 @@
-use std::{
-    io::{Read, Write},
-    net::TcpStream,
-};
+use std::io::{Read, Write};
 
 use muzzman_lib::prelude::*;
 
-use crate::error;
+use crate::{connection::Connection, error};
 
 pub fn downloading(element: &ERow, storage: &mut Storage) {
     let mut content_length: usize = 0;
@@ -32,14 +29,22 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
         let len;
 
         {
-            let Some(conn) = storage.get_mut::<TcpStream>()else{
+            let Some(conn) = storage.get_mut::<Connection>()else{
                 return;
             };
-            let Ok(size) = conn.read(&mut buffer)else{
-                error(element, "Error: connection ended unexpectedly");
-                return;
-            };
-            len = size;
+
+            match conn.read(&mut buffer) {
+                Ok(size) => {
+                    len = size;
+                }
+                Err(err) => {
+                    match err.kind() {
+                        std::io::ErrorKind::WouldBlock => {}
+                        _ => error(element, "Error: Connection close unexpected!"),
+                    }
+                    return;
+                }
+            }
         }
 
         let recived;
@@ -62,7 +67,7 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
             .write()
             .unwrap()
             .data
-            .write(&buffer[0..len])
+            .write_all(&buffer[0..len])
             .unwrap();
 
         let progress;

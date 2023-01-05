@@ -6,7 +6,7 @@ use std::{
 
 use muzzman_lib::prelude::*;
 
-use crate::error;
+use crate::{connection::Connection, error};
 
 pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     let Some(url) = get_url(element) else {
@@ -29,10 +29,63 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     };
 
     let mut conn = None;
-    for adress in adresses {
-        if let Ok(connection) = TcpStream::connect(adress) {
-            conn = Some(connection);
-            break;
+
+    if port == 443 {
+        let root_store = rustls::RootCertStore {
+            roots: webpki_roots::TLS_SERVER_ROOTS
+                .0
+                .iter()
+                .map(|e| {
+                    rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+                        e.subject,
+                        e.spki,
+                        e.name_constraints,
+                    )
+                })
+                .collect(),
+        };
+        let config = rustls::client::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+
+        let server_name = if let Some(domain) = url.domain() {
+            if let Ok(server_name) = rustls::ServerName::try_from(domain) {
+                server_name
+            } else {
+                error(element, "Cannot resolv host name");
+                return;
+            }
+        } else if let Ok(server_name) =
+            rustls::ServerName::try_from(adresses[0].ip().to_string().as_ref())
+        {
+            server_name
+        } else {
+            error(element, "Invaild url");
+            return;
+        };
+
+        if let Ok(connection) =
+            rustls::client::ClientConnection::new(std::sync::Arc::new(config), server_name)
+        {
+            let mut tcp = None;
+            for adress in adresses {
+                if let Ok(connection) = TcpStream::connect(adress) {
+                    tcp = Some(connection);
+                    break;
+                }
+            }
+
+            if let Some(tcp) = tcp {
+                conn = Some(Connection::TLSClient(connection, tcp))
+            }
+        }
+    } else {
+        for adress in adresses {
+            if let Ok(connection) = TcpStream::connect(adress) {
+                conn = Some(Connection::TCP(connection));
+                break;
+            }
         }
     }
 
@@ -65,39 +118,31 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     for header in headers {
         let send = format!("{}: {}\r\n", header.0, header.1);
         let send = send.as_bytes();
-        let Ok(size) = conn.write(send)else{
+        let Ok(_) = conn.write_all(send)else{
             error(element, "Error: Connection faild!");
             return;
         };
-
-        if size != send.len() {
-            error(element, "Error: Cannot write to connection!");
-            return;
-        }
     }
 
     if let Some(data) = element.write().unwrap().element_data.get_mut("body") {
         if let Type::FileOrData(ford) = data {
             let _ = conn
-                .write(
+                .write_all(
                     format!("Content-Length: {}", {
-                        let res = {
-                            if let Ok(cur) = ford.seek(SeekFrom::Current(0)) {
-                                let res = ford.seek(SeekFrom::End(0)).unwrap();
-                                ford.seek(SeekFrom::Start(cur)).unwrap();
-                                res
-                            } else {
-                                0
-                            }
-                        };
-                        res
+                        if let Ok(cur) = ford.seek(SeekFrom::Current(0)) {
+                            let res = ford.seek(SeekFrom::End(0)).unwrap();
+                            ford.seek(SeekFrom::Start(cur)).unwrap();
+                            res
+                        } else {
+                            0
+                        }
                     })
                     .as_bytes(),
                 )
                 .unwrap();
         }
     }
-    conn.write(b"\r\n\r\n").unwrap();
+    conn.write_all(b"\r\n\r\n").unwrap();
 
     {
         let mut bytes = [0; 1];
@@ -117,40 +162,51 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             if r == 2 && n == 2 {
                 break;
             }
-            let read = conn.read(&mut bytes).unwrap();
-            if read == 1 {
-                match bytes[0] {
-                    b'\r' => r += 1,
-                    b'\n' => n += 1,
-                    _ => {
-                        if r > 0 && n > 0 {
-                            match count {
-                                0 => {
-                                    let spaces = buffer.split(' ').collect::<Vec<&str>>();
-                                    status = spaces[1].parse().unwrap();
-                                    let mut data = String::new();
-                                    for s in spaces[2..].iter() {
-                                        data.push_str(s);
-                                        data.push(' ');
+            match conn.read(&mut bytes) {
+                Ok(read) => {
+                    if read == 1 {
+                        match bytes[0] {
+                            b'\r' => r += 1,
+                            b'\n' => n += 1,
+                            _ => {
+                                if r > 0 && n > 0 {
+                                    match count {
+                                        0 => {
+                                            let spaces = buffer.split(' ').collect::<Vec<&str>>();
+                                            status = spaces[1].parse().unwrap();
+                                            let mut data = String::new();
+                                            for s in spaces[2..].iter() {
+                                                data.push_str(s);
+                                                data.push(' ');
+                                            }
+                                            status_str = data;
+                                        }
+                                        _ => {
+                                            let map = buffer.split(':').collect::<Vec<&str>>();
+                                            headers.insert(map[0].to_owned(), map[1].to_owned());
+                                        }
                                     }
-                                    status_str = data;
+                                    count += 1;
+                                    buffer.clear();
                                 }
-                                _ => {
-                                    let map = buffer.split(':').collect::<Vec<&str>>();
-                                    headers.insert(map[0].to_owned(), map[1].to_owned());
-                                }
-                            }
-                            count += 1;
-                            buffer.clear();
-                        }
-                        buffer.push(bytes[0] as char);
+                                buffer.push(bytes[0] as char);
 
-                        r = 0;
-                        n = 0;
+                                r = 0;
+                                n = 0;
+                            }
+                        }
+                    } else {
+                        break;
                     }
                 }
-            } else {
-                break;
+
+                Err(err) => match err.kind() {
+                    std::io::ErrorKind::WouldBlock => {}
+                    _ => {
+                        error(element, format!("Error: {:?}", err));
+                        return;
+                    }
+                },
             }
         }
 
