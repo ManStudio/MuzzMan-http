@@ -33,6 +33,11 @@ pub fn action_download(info: MInfo, values: Vec<Type>) {
                                 data.set("url", Type::String(url.to_owned()));
                                 let _ = element.set_element_data(data);
                             }
+                            if let Some(should_enable) = values.get(1) {
+                                if let Type::Bool(should_enable) = should_enable {
+                                    let _ = element.set_enabled(*should_enable, None);
+                                }
+                            }
                         }
                     }
                 }
@@ -45,10 +50,22 @@ impl TModule for ModuleHttp {
     fn init(&self, info: MInfo) -> Result<(), String> {
         let _ = info.register_action(
             String::from("download"),
-            vec![(
-                String::from("url"),
-                Value::new(Type::None, vec![TypeTag::String], vec![], true, ""),
-            )],
+            vec![
+                (
+                    String::from("url"),
+                    Value::new(Type::None, vec![TypeTag::String], vec![], true, ""),
+                ),
+                (
+                    String::from("auto_start"),
+                    Value::new(
+                        Type::Bool(true),
+                        vec![TypeTag::Bool],
+                        vec![],
+                        true,
+                        "If should auto enable",
+                    ),
+                ),
+            ],
             action_download,
         );
         Ok(())
