@@ -19,27 +19,22 @@ impl ModuleHttp {
 }
 
 pub fn action_download(info: MInfo, values: Vec<Type>) {
-    if let Some(url) = values.get(0) {
-        if let Type::String(url) = url {
-            let s = url.clone();
-            let splited = s.split("/").collect::<Vec<&str>>();
-            if let Some(filename) = splited.get(splited.len() - 1) {
-                if let Ok(session) = info.get_session() {
-                    if let Ok(location) = session.get_default_location() {
-                        if let Ok(element) = location.create_element(&filename.to_string()) {
-                            let _ = element.set_module(Some(info.clone()));
-                            let _ = element.init();
-                            if let Ok(mut data) = element.get_element_data() {
-                                data.set("url", Type::String(url.to_owned()));
-                                let _ = element.set_element_data(data);
-                            }
-                            if let Some(should_enable) = values.get(1) {
-                                if let Type::Bool(should_enable) = should_enable {
-                                    let _ = element.set_enabled(*should_enable, None);
-                                }
-                            }
-                        }
+    let Some(url) = values.get(0)else{return};
+    let Ok(url): Result<String, ()> = url.clone().try_into() else{return};
+    let splited = url.split("/").collect::<Vec<&str>>();
+    if let Some(filename) = splited.last() {
+        if let Ok(session) = info.get_session() {
+            if let Ok(location) = session.get_default_location() {
+                if let Ok(element) = location.create_element(filename) {
+                    let _ = element.set_module(Some(info.clone()));
+                    let _ = element.init();
+                    if let Ok(mut data) = element.get_element_data() {
+                        data.set("url", Type::String(url.to_owned()));
+                        let _ = element.set_element_data(data);
                     }
+                    let Some(should_enable) = values.get(1) else{return};
+                    let Ok(should_enable) = should_enable.clone().try_into()else{return};
+                    let _ = element.set_enabled(should_enable, None);
                 }
             }
         }
