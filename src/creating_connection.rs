@@ -9,6 +9,8 @@ use muzzman_lib::prelude::*;
 use crate::{connection::Connection, error};
 
 pub fn creating_connection(element: &ERow, storage: &mut Storage) {
+    let mut logger = element.get_logger(None);
+
     let Some(url) = get_url(element) else {
         return
     };
@@ -31,6 +33,8 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     let mut conn = None;
 
     if port == 443 {
+        logger.info("Start connection on port 433 that means that should be tls");
+        logger.info("Try to create tls connection!");
         let root_store = rustls::RootCertStore {
             roots: webpki_roots::TLS_SERVER_ROOTS
                 .0
@@ -65,6 +69,8 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             return;
         };
 
+        logger.info("Tls setup success!");
+
         if let Ok(connection) =
             rustls::client::ClientConnection::new(std::sync::Arc::new(config), server_name)
         {
@@ -77,12 +83,15 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             }
 
             if let Some(tcp) = tcp {
+                logger.info("Tls Connected");
                 conn = Some(Connection::TLSClient(connection, tcp))
             }
         }
     } else {
+        logger.info("Starting Tcp Connection");
         for adress in adresses {
             if let Ok(connection) = TcpStream::connect(adress) {
+                logger.info("Connection succesfuly!");
                 conn = Some(Connection::TCP(connection));
                 break;
             }
@@ -100,6 +109,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
         url.path(),
         url.domain().unwrap()
     );
+    logger.info(format!("Sending Request: {}", send));
     let send = send.as_bytes();
 
     let Ok(size) = conn.write(send) else{
@@ -115,6 +125,8 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
         return;
     }
 
+    logger.info(format!("Headers: {:?}", headers));
+
     for header in headers {
         let send = format!("{}: {}\r\n", header.0, header.1);
         let send = send.as_bytes();
@@ -124,25 +136,27 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
         };
     }
 
-    if let Some(data) = element.write().unwrap().element_data.get_mut("body") {
-        if let Type::FileOrData(ford) = data {
-            let _ = conn
-                .write_all(
-                    format!("Content-Length: {}", {
-                        if let Ok(cur) = ford.seek(SeekFrom::Current(0)) {
-                            let res = ford.seek(SeekFrom::End(0)).unwrap();
-                            ford.seek(SeekFrom::Start(cur)).unwrap();
-                            res
-                        } else {
-                            0
-                        }
-                    })
-                    .as_bytes(),
-                )
-                .unwrap();
+    if let Some(Type::FileOrData(ford)) = element.write().unwrap().element_data.get_mut("body") {
+        let send = format!("Content-Length: {}", {
+            if let Ok(cur) = ford.seek(SeekFrom::Current(0)) {
+                let res = ford.seek(SeekFrom::End(0)).unwrap();
+                ford.seek(SeekFrom::Start(cur)).unwrap();
+                res
+            } else {
+                0
+            }
+        });
+        logger.info(format!("Add header: {}", send));
+        let res = conn.write_all(send.as_bytes());
+
+        if let Err(err) = res {
+            logger.error("Cannot Send Contelt-Length header!");
+            error(element, err.to_string());
+            return;
         }
     }
     conn.write_all(b"\r\n\r\n").unwrap();
+    logger.info("Response beagin reading");
 
     {
         let mut bytes = [0; 1];
@@ -210,6 +224,9 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             }
         }
 
+        logger.info(format!("Status: {} {}", status, status_str));
+        logger.info(format!("Response Headers: {:?}", headers));
+
         if status != 200 {
             error(
                 element,
@@ -227,8 +244,11 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
                 return;
             }
         } else {
+            logger.info("No Content Length finded!");
             content_length = usize::MAX;
         }
+
+        logger.info(format!("Content-Length set to {}", content_length));
 
         {
             let mut element = element.write().unwrap();
@@ -310,11 +330,9 @@ pub fn get_method(element: &ERow) -> Option<String> {
 
 pub fn get_headers(element: &ERow) -> HashMap<String, String> {
     let mut headers = HashMap::new();
-    if let Some(data) = element.read().unwrap().element_data.get("headers") {
-        match data {
-            Type::HashMapSS(tmp_headers) => headers = tmp_headers.clone(),
-            _ => {}
-        }
+    if let Some(Type::HashMapSS(tmp_headers)) = element.read().unwrap().element_data.get("headers")
+    {
+        headers = tmp_headers.clone();
     }
     headers
 }

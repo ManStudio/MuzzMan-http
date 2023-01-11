@@ -5,11 +5,11 @@ use muzzman_lib::prelude::*;
 use crate::{connection::Connection, error};
 
 pub fn uploading(element: &ERow, storage: &mut Storage) {
+    let mut logger = element.get_logger(None);
+
     let mut sent = 0;
-    if let Some(data) = element.read().unwrap().module_data.get("sent") {
-        if let Type::USize(ptr) = data {
-            sent = *ptr;
-        }
+    if let Some(Type::USize(ptr)) = element.read().unwrap().module_data.get("sent") {
+        sent = *ptr;
     }
 
     let Some(mut buffer_size) = get_buffer_size(element) else{
@@ -24,13 +24,14 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
         buffer_size = content_length - sent;
     }
 
+    logger.info(format!("Sent: {}", sent));
+    logger.info(format!("Buffer size: {}", buffer_size));
+
     let mut bytes = vec![0; buffer_size];
     let mut add = 0;
 
-    if let Some(data) = element.write().unwrap().element_data.get_mut("body") {
-        if let Type::FileOrData(ford) = data {
-            add = ford.read(&mut bytes).unwrap();
-        }
+    if let Some(Type::FileOrData(ford)) = element.write().unwrap().element_data.get_mut("body") {
+        add = ford.read(&mut bytes).unwrap();
     }
 
     if let Some(conn) = storage.get_mut::<Connection>() {
@@ -42,11 +43,11 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
 
     sent += add;
 
-    if let Some(data) = element.write().unwrap().module_data.get_mut("sent") {
-        if let Type::USize(ptr) = data {
-            *ptr = sent;
-        }
+    if let Some(Type::USize(ptr)) = element.write().unwrap().module_data.get_mut("sent") {
+        *ptr = sent;
     }
+
+    logger.info(format!("New sent: {}", sent));
 
     if add == 0 {
         element.set_status(3);

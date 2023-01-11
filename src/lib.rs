@@ -18,7 +18,7 @@ impl ModuleHttp {
     }
 }
 
-pub fn action_download(info: MInfo, values: Vec<Type>) {
+pub fn action_download(info: MRef, values: Vec<Type>) {
     let Some(url) = values.get(0)else{return};
     let Ok(url): Result<String, ()> = url.clone().try_into() else{return};
     let splited = url.split("/").collect::<Vec<&str>>();
@@ -42,7 +42,7 @@ pub fn action_download(info: MInfo, values: Vec<Type>) {
 }
 
 impl TModule for ModuleHttp {
-    fn init(&self, info: MInfo) -> Result<(), String> {
+    fn init(&self, info: MRef) -> Result<(), String> {
         let _ = info.register_action(
             String::from("download"),
             vec![
@@ -121,7 +121,7 @@ impl TModule for ModuleHttp {
     }
 
     fn init_element_settings(&self, data: &mut Data) {
-        let mut method_enum = CustomEnum::new();
+        let mut method_enum = CustomEnum::default();
         method_enum.add("GET");
         method_enum.add("HEAD");
         method_enum.add("POST");
@@ -376,16 +376,27 @@ impl TModule for ModuleHttp {
         false
     }
 
-    fn init_location(&self, _location: LInfo, _data: FileOrData) {
+    fn init_location(&self, _location: LRef, _data: FileOrData) {
         // For http has noting to do possibile to download everything from a web but is useless now
     }
 
     fn c(&self) -> Box<dyn TModule> {
         Box::new(Self)
     }
+
+    fn step_location(&self, location: LRow, control_flow: &mut ControlFlow, storage: &mut Storage) {
+        todo!()
+    }
+
+    fn notify(&self, info: Ref, event: Event) {}
 }
 
 pub fn error(element: &ERow, error: impl Into<String>) {
-    element.write().unwrap().statuses[9] = String::from(error.into());
+    let error = error.into();
+    {
+        let mut logger = element.get_logger(None);
+        logger.error(error.clone())
+    }
+    element.write().unwrap().statuses[9] = error;
     element.set_status(9);
 }
