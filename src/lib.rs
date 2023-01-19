@@ -21,7 +21,7 @@ impl ModuleHttp {
 pub fn action_download(info: MRef, values: Vec<Type>) {
     let Some(url) = values.get(0)else{return};
     let Ok(url): Result<String, ()> = url.clone().try_into() else{return};
-    let splited = url.split("/").collect::<Vec<&str>>();
+    let splited = url.split('/').collect::<Vec<&str>>();
     if let Some(filename) = splited.last() {
         if let Ok(session) = info.get_session() {
             if let Ok(location) = session.get_default_location() {
@@ -42,8 +42,8 @@ pub fn action_download(info: MRef, values: Vec<Type>) {
 }
 
 impl TModule for ModuleHttp {
-    fn init(&self, info: MRef) -> Result<(), String> {
-        let _ = info.register_action(
+    fn init(&self, module_ref: MRef) -> Result<(), String> {
+        let _ = module_ref.register_action(
             String::from("download"),
             vec![
                 (
@@ -197,13 +197,13 @@ impl TModule for ModuleHttp {
         );
     }
 
-    fn init_element(&self, element: ERow) {
+    fn init_element(&self, element_row: ERow) {
         // the element data and module data should be added by the session when module is added before the init_element or step_element
         // the order is really important!
 
-        element.write().unwrap().progress = 0.0;
+        element_row.write().unwrap().progress = 0.0;
 
-        let mut element = element.write().unwrap();
+        let mut element = element_row.write().unwrap();
 
         let _ = element.data.seek(std::io::SeekFrom::Start(0));
 
@@ -227,8 +227,13 @@ impl TModule for ModuleHttp {
         element.status = 0;
     }
 
-    fn step_element(&self, element: ERow, control_flow: &mut ControlFlow, storage: &mut Storage) {
-        let status = element.read().unwrap().status;
+    fn step_element(
+        &self,
+        element_row: ERow,
+        control_flow: &mut ControlFlow,
+        storage: &mut Storage,
+    ) {
+        let status = element_row.read().unwrap().status;
 
         match status {
             0 => {
@@ -237,23 +242,23 @@ impl TModule for ModuleHttp {
                 let v_res_2;
 
                 {
-                    let element = element.read().unwrap();
+                    let element = element_row.read().unwrap();
                     v_res_1 = element.element_data.validate();
                     v_res_2 = element.module_data.validate();
                 }
 
                 if let Some(errors) = v_res_1 {
-                    error(&element, format!("Error: element data: {}", errors));
+                    error(&element_row, format!("Error: element data: {}", errors));
                     return;
                 }
 
                 if let Some(errors) = v_res_2 {
-                    error(&element, format!("Error: module data: {}", errors));
+                    error(&element_row, format!("Error: module data: {}", errors));
                     return;
                 }
 
                 {
-                    let mut element = element.write().unwrap();
+                    let mut element = element_row.write().unwrap();
                     element.element_data.lock();
                     element.module_data.lock();
                 }
@@ -261,7 +266,7 @@ impl TModule for ModuleHttp {
                 // TODO: Validate url!
 
                 {
-                    let mut element = element.write().unwrap();
+                    let mut element = element_row.write().unwrap();
                     match element.element_data.get("port").unwrap().clone() {
                         Type::U16(_) => {}
                         _ => {
@@ -315,20 +320,20 @@ impl TModule for ModuleHttp {
                     }
                 }
 
-                element.set_status(1);
+                element_row.set_status(1);
             }
             1 => {
-                creating_connection(&element, storage);
+                creating_connection(&element_row, storage);
             }
             2 => {
                 // Change module
                 todo!()
             }
             3 => {
-                downloading(&element, storage);
+                downloading(&element_row, storage);
             }
             4 => {
-                uploading(&element, storage);
+                uploading(&element_row, storage);
             }
             5 => { // Paused
             }
@@ -342,12 +347,12 @@ impl TModule for ModuleHttp {
             }
             8 => {
                 // Complited
-                element.write().unwrap().enabled = false;
+                element_row.write().unwrap().enabled = false;
                 *control_flow = ControlFlow::Break;
             }
             9 => {
                 // Error
-                element.write().unwrap().enabled = false;
+                element_row.write().unwrap().enabled = false;
                 *control_flow = ControlFlow::Break;
             }
             _ => {
@@ -367,7 +372,7 @@ impl TModule for ModuleHttp {
         // in the feature https://
         // posibile for other module
 
-        if let Some(protocol) = url.as_str().split('/').collect::<Vec<&str>>().get(0) {
+        if let Some(protocol) = url.as_str().split('/').collect::<Vec<&str>>().first() {
             if protocol.trim() == "http:".trim() {
                 return true;
             }
@@ -376,7 +381,7 @@ impl TModule for ModuleHttp {
         false
     }
 
-    fn init_location(&self, _location: LRef, _data: FileOrData) {
+    fn init_location(&self, _location_ref: LRef, _data: FileOrData) {
         // For http has noting to do possibile to download everything from a web but is useless now
     }
 
@@ -384,11 +389,16 @@ impl TModule for ModuleHttp {
         Box::new(Self)
     }
 
-    fn step_location(&self, location: LRow, control_flow: &mut ControlFlow, storage: &mut Storage) {
+    fn step_location(
+        &self,
+        location_ref: LRow,
+        control_flow: &mut ControlFlow,
+        storage: &mut Storage,
+    ) {
         todo!()
     }
 
-    fn notify(&self, info: Ref, event: Event) {}
+    fn notify(&self, _ref: Ref, event: Event) {}
 }
 
 pub fn error(element: &ERow, error: impl Into<String>) {
