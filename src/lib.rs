@@ -26,7 +26,7 @@ pub fn action_download(info: MRef, values: Vec<Type>) {
         if let Ok(session) = info.get_session() {
             if let Ok(location) = session.get_default_location() {
                 if let Ok(element) = location.create_element(filename) {
-                    let _ = element.set_module(Some(info.clone()));
+                    let _ = element.set_module(Some(info.id()));
                     let _ = element.init();
                     if let Ok(mut data) = element.get_element_data() {
                         data.set("url", Type::String(url.to_owned()));
