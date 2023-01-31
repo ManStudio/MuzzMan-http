@@ -4,6 +4,8 @@ use std::{
     net::TcpStream,
 };
 
+use url::Url;
+
 use muzzman_lib::prelude::*;
 
 use crate::{connection::Connection, error};
@@ -11,7 +13,13 @@ use crate::{connection::Connection, error};
 pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     let mut logger = element.get_logger(None);
 
-    let Some(url) = get_url(element) else {
+    let Some(url) = element.read().unwrap().url.clone() else {
+        error(element, "No url");
+        return
+    };
+
+    let Ok(url) = Url::parse(&url)else{
+        error(element, "Cannot parse url");
         return
     };
 
@@ -261,41 +269,6 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
 
     storage.set(conn);
     element.set_status(4)
-}
-
-pub fn get_url(element: &ERow) -> Option<Url> {
-    let error_i: u8;
-
-    if let Some(url) = element.read().unwrap().element_data.get("url") {
-        if let Type::String(url) = url {
-            if let Ok(url) = Url::parse(url.clone().as_str()) {
-                return Some(url);
-            } else {
-                error_i = 2;
-            }
-        } else {
-            error_i = 1;
-        }
-    } else {
-        error_i = 0;
-    }
-
-    //
-    // Errors is posibile to be useless because every attribute are checked at init stage.
-    // Errors is usefull only when a client ignore safty!
-    //
-
-    error(
-        element,
-        match error_i {
-            0 => "Error: has no url!",
-            1 => "Error: url should be string!",
-            2 => "Error: invalid url!",
-            _ => "Error: IDK",
-        },
-    );
-
-    None
 }
 
 pub fn get_method(element: &ERow) -> Option<String> {

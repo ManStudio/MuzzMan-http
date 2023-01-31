@@ -27,11 +27,8 @@ pub fn action_download(info: MRef, values: Vec<Type>) {
             if let Ok(location) = session.get_default_location() {
                 if let Ok(element) = location.create_element(filename) {
                     let _ = element.set_module(Some(info.id()));
+                    element.set_url(Some(url));
                     let _ = element.init();
-                    if let Ok(mut data) = element.get_element_data() {
-                        data.set("url", Type::String(url.to_owned()));
-                        let _ = element.set_element_data(data);
-                    }
                     let Some(should_enable) = values.get(1) else{return};
                     let Ok(should_enable) = should_enable.clone().try_into()else{return};
                     let _ = element.set_enabled(should_enable, None);
@@ -139,17 +136,6 @@ impl TModule for ModuleHttp {
         //
         // TODO: Implement Https
         //
-
-        data.add(
-            "url",
-            Value::new(
-                Type::None,
-                vec![TypeTag::String, TypeTag::Url],
-                vec![],
-                true,
-                "The url that will be used to upload/download",
-            ),
-        );
 
         data.add("method", Type::CustomEnum(method_enum));
         data.add("headers", Type::HashMapSS(headers));
@@ -271,13 +257,11 @@ impl TModule for ModuleHttp {
                         Type::U16(_) => {}
                         _ => {
                             let mut port = 80;
-                            if let Some(url) = element.element_data.get("url") {
-                                if let Type::String(url) = url {
-                                    let v = url.split(":").collect::<Vec<&str>>();
-                                    if let Some(proto) = v.get(0) {
-                                        if proto.trim() == "https" {
-                                            port = 443;
-                                        }
+                            if let Some(url) = element.url.clone() {
+                                let v = url.split(":").collect::<Vec<&str>>();
+                                if let Some(proto) = v.get(0) {
+                                    if proto.trim() == "https" {
+                                        port = 443;
                                     }
                                 }
                             }
@@ -366,13 +350,13 @@ impl TModule for ModuleHttp {
         false
     }
 
-    fn accept_url(&self, url: Url) -> bool {
+    fn accept_url(&self, url: String) -> bool {
         // if url has http://
 
         // in the feature https://
         // posibile for other module
 
-        if let Some(protocol) = url.as_str().split('/').collect::<Vec<&str>>().first() {
+        if let Some(protocol) = url.split('/').collect::<Vec<&str>>().first() {
             if protocol.trim() == "http:".trim() {
                 return true;
             }
@@ -381,12 +365,12 @@ impl TModule for ModuleHttp {
         false
     }
 
-    fn init_location(&self, _location_ref: LRef, _data: FileOrData) {
-        // For http has noting to do possibile to download everything from a web but is useless now
+    fn accepted_protocols(&self) -> Vec<String> {
+        vec!["http".into(), "https".into()]
     }
 
-    fn c(&self) -> Box<dyn TModule> {
-        Box::new(Self)
+    fn init_location(&self, _location_ref: LRef, _data: FileOrData) {
+        // For http has noting to do possibile to download everything from a web but is useless now
     }
 
     fn step_location(
@@ -399,6 +383,10 @@ impl TModule for ModuleHttp {
     }
 
     fn notify(&self, _ref: Ref, event: Event) {}
+
+    fn c(&self) -> Box<dyn TModule> {
+        Box::new(Self)
+    }
 }
 
 pub fn error(element: &ERow, error: impl Into<String>) {

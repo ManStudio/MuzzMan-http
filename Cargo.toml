@@ -19,7 +19,8 @@ codegen-units = 128
 crate-type = ["cdylib"]
 
 [dependencies]
-muzzman-lib = "0.3.0" 
+muzzman-lib = "0.3.2" 
 rustls = "0.20.7"
+url = "2.3.1"
 webpki = "0.22.0"
 webpki-roots = "0.22.6"
