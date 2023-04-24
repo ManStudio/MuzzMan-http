@@ -8,7 +8,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
     let mut logger = element.get_logger(None);
 
     let mut sent = 0;
-    if let Some(Type::USize(ptr)) = element.read().unwrap().module_data.get("sent") {
+    if let Some(Type::USize(ptr)) = element.read().unwrap().settings.get("sent") {
         sent = *ptr;
     }
 
@@ -43,7 +43,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
 
     sent += add;
 
-    if let Some(Type::USize(ptr)) = element.write().unwrap().module_data.get_mut("sent") {
+    if let Some(Type::USize(ptr)) = element.write().unwrap().settings.get_mut("sent") {
         *ptr = sent;
     }
 
@@ -57,7 +57,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
 pub fn get_buffer_size(element: &ERow) -> Option<usize> {
     let error_i;
 
-    if let Some(buffer_size) = element.read().unwrap().module_data.get("buffer_size") {
+    if let Some(buffer_size) = element.read().unwrap().settings.get("buffer_size") {
         if let Type::USize(buffer_size) = buffer_size {
             return Some(*buffer_size);
         } else {

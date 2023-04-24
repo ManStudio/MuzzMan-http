@@ -263,7 +263,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             element
                 .element_data
                 .set("download-content-length", Type::USize(content_length));
-            element.module_data.set("headers", Type::HashMapSS(headers));
+            element.settings.set("headers", Type::HashMapSS(headers));
         }
     }
 

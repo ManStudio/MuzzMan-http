@@ -6,6 +6,7 @@ use creating_connection::creating_connection;
 use downloading::downloading;
 
 use muzzman_lib::prelude::*;
+use std::ops::Range;
 use std::{collections::HashMap, io::Seek};
 use uploading::uploading;
 
@@ -71,8 +72,20 @@ impl TModule for ModuleHttp {
         String::from("Http Module")
     }
 
-    fn init_settings(&self, data: &mut Data) {
-        data.add(
+    fn get_uid(&self) -> UID {
+        1
+    }
+
+    fn get_version(&self) -> String {
+        "MuzzManHttp: 1".to_string()
+    }
+
+    fn supported_versions(&self) -> std::ops::Range<u64> {
+        1..2
+    }
+
+    fn init_settings(&self, values: &mut Values) {
+        values.add(
             "buffer_size",
             Value::new(
                 Type::USize(8192),
@@ -83,7 +96,7 @@ impl TModule for ModuleHttp {
             ),
         );
 
-        data.add(
+        values.add(
             "recv",
             Value::new(
                 Type::USize(0),
@@ -94,7 +107,7 @@ impl TModule for ModuleHttp {
             ),
         );
 
-        data.add(
+        values.add(
             "sent",
             Value::new(
                 Type::USize(0),
@@ -105,7 +118,7 @@ impl TModule for ModuleHttp {
             ),
         );
 
-        data.add(
+        values.add(
             "headers",
             Value::new(
                 Type::None,
@@ -117,7 +130,7 @@ impl TModule for ModuleHttp {
         );
     }
 
-    fn init_element_settings(&self, data: &mut Data) {
+    fn init_element_settings(&self, values: &mut Values) {
         let mut method_enum = CustomEnum::default();
         method_enum.add("GET");
         method_enum.add("HEAD");
@@ -137,9 +150,9 @@ impl TModule for ModuleHttp {
         // TODO: Implement Https
         //
 
-        data.add("method", Type::CustomEnum(method_enum));
-        data.add("headers", Type::HashMapSS(headers));
-        data.add(
+        values.add("method", Type::CustomEnum(method_enum));
+        values.add("headers", Type::HashMapSS(headers));
+        values.add(
             "port",
             Value::new(
                 Type::None,
@@ -149,7 +162,7 @@ impl TModule for ModuleHttp {
                 "The port that will be used by connection! if none will auto detect from url",
             ),
         );
-        data.add(
+        values.add(
             "body",
             Value::new(
                 Type::None,
@@ -160,7 +173,7 @@ impl TModule for ModuleHttp {
             ),
         );
 
-        data.add(
+        values.add(
             "upload-content-length",
             Value::new(
                 Type::None,
@@ -171,7 +184,7 @@ impl TModule for ModuleHttp {
             ),
         );
 
-        data.add(
+        values.add(
             "download-content-length",
             Value::new(
                 Type::None,
@@ -194,11 +207,11 @@ impl TModule for ModuleHttp {
         let _ = element.data.seek(std::io::SeekFrom::Start(0));
 
         element.element_data.unlock();
-        element.module_data.unlock();
+        element.settings.unlock();
 
-        element.module_data.set("conn", Type::None);
-        element.module_data.set("sent", Type::USize(0));
-        element.module_data.set("recv", Type::USize(0));
+        element.settings.set("conn", Type::None);
+        element.settings.set("sent", Type::USize(0));
+        element.settings.set("recv", Type::USize(0));
 
         element.statuses.push("Initializeting".to_owned()); // 0
         element.statuses.push("Negotieiting Connection".to_owned()); // 1
@@ -230,7 +243,7 @@ impl TModule for ModuleHttp {
                 {
                     let element = element_row.read().unwrap();
                     v_res_1 = element.element_data.validate();
-                    v_res_2 = element.module_data.validate();
+                    v_res_2 = element.settings.validate();
                 }
 
                 if let Some(errors) = v_res_1 {
@@ -246,7 +259,7 @@ impl TModule for ModuleHttp {
                 {
                     let mut element = element_row.write().unwrap();
                     element.element_data.lock();
-                    element.module_data.lock();
+                    element.settings.lock();
                 }
 
                 // TODO: Validate url!
@@ -365,11 +378,15 @@ impl TModule for ModuleHttp {
         false
     }
 
+    fn accepted_extensions(&self) -> Vec<String> {
+        todo!()
+    }
+
     fn accepted_protocols(&self) -> Vec<String> {
         vec!["http".into(), "https".into()]
     }
 
-    fn init_location(&self, _location_ref: LRef, _data: FileOrData) {
+    fn init_location(&self, _location_ref: LRef) {
         // For http has noting to do possibile to download everything from a web but is useless now
     }
 

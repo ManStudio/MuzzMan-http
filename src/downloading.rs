@@ -19,7 +19,7 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
 
     if content_length > 0 {
         let mut buffer_size = 0;
-        if let Some(Type::USize(len)) = element.read().unwrap().module_data.get("buffer_size") {
+        if let Some(Type::USize(len)) = element.read().unwrap().settings.get("buffer_size") {
             buffer_size = *len;
         }
 
@@ -49,14 +49,14 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
 
         'd: {
             let mut element = element.write().unwrap();
-            if let Some(Type::USize(recived_b)) = element.module_data.get_mut("recv") {
+            if let Some(Type::USize(recived_b)) = element.settings.get_mut("recv") {
                 *recived_b += len;
                 recived = *recived_b;
                 break 'd;
             }
 
             recived = len;
-            element.module_data.set("recv", Type::USize(len));
+            element.settings.set("recv", Type::USize(len));
         }
 
         logger.info(format!("Recived: {}", recived));
