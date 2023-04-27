@@ -370,11 +370,8 @@ impl TModule for ModuleHttp {
         // posibile for other module
 
         if let Some(protocol) = url.split('/').collect::<Vec<&str>>().first() {
-            if protocol.trim() == "http:".trim() {
-                return true;
-            }
+            return matches!(protocol.trim(), "http:" | "https:");
         }
-
         false
     }
 
