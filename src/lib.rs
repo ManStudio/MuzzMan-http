@@ -271,7 +271,7 @@ impl TModule for ModuleHttp {
                         _ => {
                             let mut port = 80;
                             if let Some(url) = element.url.clone() {
-                                let v = url.split(":").collect::<Vec<&str>>();
+                                let v = url.split(':').collect::<Vec<&str>>();
                                 if let Some(proto) = v.get(0) {
                                     if proto.trim() == "https" {
                                         port = 443;
