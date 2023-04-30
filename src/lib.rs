@@ -40,7 +40,7 @@ pub fn action_download(info: MRef, values: Vec<Type>) {
 }
 
 impl TModule for ModuleHttp {
-    fn init(&self, module_ref: MRef) -> Result<(), String> {
+    fn init(&self, module_ref: MRef) -> Result<(), SessionError> {
         let _ = module_ref.register_action(
             String::from("download"),
             vec![
@@ -84,7 +84,7 @@ impl TModule for ModuleHttp {
         1..2
     }
 
-    fn init_settings(&self, values: &mut Values) {
+    fn init_settings(&self, values: &mut Values) -> Result<(), SessionError> {
         values.add(
             "buffer_size",
             Value::new(
@@ -128,9 +128,10 @@ impl TModule for ModuleHttp {
                 "response headers!",
             ),
         );
+        Ok(())
     }
 
-    fn init_element_settings(&self, values: &mut Values) {
+    fn init_element_settings(&self, values: &mut Values) -> Result<(), SessionError> {
         let mut method_enum = CustomEnum::default();
         method_enum.add("GET");
         method_enum.add("HEAD");
@@ -194,9 +195,10 @@ impl TModule for ModuleHttp {
                 "how much to download! if is none will download all",
             ),
         );
+        Ok(())
     }
 
-    fn init_element(&self, element_row: ERow) {
+    fn init_element(&self, element_row: ERow) -> Result<(), SessionError> {
         // the element data and module data should be added by the session when module is added before the init_element or step_element
         // the order is really important!
 
@@ -224,6 +226,7 @@ impl TModule for ModuleHttp {
         element.statuses.push("Complited".to_string()); // 8
         element.statuses.push("Error".to_string()); // 9
         element.status = 0;
+        Ok(())
     }
 
     fn step_element(
@@ -231,7 +234,7 @@ impl TModule for ModuleHttp {
         element_row: ERow,
         control_flow: &mut ControlFlow,
         storage: &mut Storage,
-    ) {
+    ) -> Result<(), SessionError> {
         let status = element_row.read().unwrap().status;
 
         match status {
@@ -248,12 +251,12 @@ impl TModule for ModuleHttp {
 
                 if let Some(errors) = v_res_1 {
                     error(&element_row, format!("Error: element data: {}", errors));
-                    return;
+                    return Ok(());
                 }
 
                 if let Some(errors) = v_res_2 {
                     error(&element_row, format!("Error: module data: {}", errors));
-                    return;
+                    return Ok(());
                 }
 
                 {
@@ -356,6 +359,7 @@ impl TModule for ModuleHttp {
                 eprintln!("Some thing is rong with the element status for ModuleHTTP!")
             }
         }
+        Ok(())
     }
 
     fn accept_extension(&self, _filename: &str) -> bool {
@@ -383,8 +387,9 @@ impl TModule for ModuleHttp {
         vec!["http".into(), "https".into()]
     }
 
-    fn init_location(&self, _location_ref: LRef) {
+    fn init_location(&self, _location_ref: LRef) -> Result<(), SessionError> {
         // For http has noting to do possibile to download everything from a web but is useless now
+        Ok(())
     }
 
     fn step_location(
@@ -392,14 +397,20 @@ impl TModule for ModuleHttp {
         location_ref: LRow,
         control_flow: &mut ControlFlow,
         storage: &mut Storage,
-    ) {
-        todo!()
+    ) -> Result<(), SessionError> {
+        Ok(())
     }
 
-    fn notify(&self, _ref: Ref, event: Event) {}
+    fn notify(&self, _ref: Ref, event: Event) -> Result<(), SessionError> {
+        Ok(())
+    }
 
     fn c(&self) -> Box<dyn TModule> {
         Box::new(Self)
+    }
+
+    fn init_location_settings(&self, data: &mut Values) -> Result<(), SessionError> {
+        todo!()
     }
 }
 
