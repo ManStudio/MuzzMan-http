@@ -380,7 +380,7 @@ impl TModule for ModuleHttp {
     }
 
     fn accepted_extensions(&self) -> Vec<String> {
-        todo!()
+        vec![]
     }
 
     fn accepted_protocols(&self) -> Vec<String> {
@@ -410,7 +410,7 @@ impl TModule for ModuleHttp {
     }
 
     fn init_location_settings(&self, data: &mut Values) -> Result<(), SessionError> {
-        todo!()
+        Ok(())
     }
 }
 
