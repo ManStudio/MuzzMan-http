@@ -10,32 +10,25 @@ use muzzman_lib::prelude::*;
 
 use crate::{connection::Connection, error};
 
-pub fn creating_connection(element: &ERow, storage: &mut Storage) {
+pub fn creating_connection(element: &ERow, storage: &mut Storage) -> Result<(), SessionError> {
     let mut logger = element.get_logger(None);
 
     let Some(url) = element.read().unwrap().url.clone() else {
-        error(element, "No url");
-        return
+        return Err(error(element, "No url"));
     };
 
     let Ok(url) = Url::parse(&url)else{
-        error(element, "Cannot parse url");
-        return
+        return Err(error(element, "Cannot parse url"));
     };
 
-    let Some(method) = get_method(element) else{
-        return;
-    };
+    let method = get_method(element)?;
 
-    let Some(port) = get_port(element) else {
-        return;
-    };
+    let port = get_port(element)?;
 
     let headers = get_headers(element);
 
     let Ok(adresses) = url.socket_addrs(|| Some(port))else{
-        error(element, "Error: cannot resolv host, is probably a invalid url or your dns is blocking it!");
-        return;
+        return Err(error(element, "Error: cannot resolv host, is probably a invalid url or your dns is blocking it!"));
     };
 
     let mut conn = None;
@@ -65,16 +58,14 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             if let Ok(server_name) = rustls::ServerName::try_from(domain) {
                 server_name
             } else {
-                error(element, "Cannot resolv host name");
-                return;
+                return Err(error(element, "Cannot resolv host name"));
             }
         } else if let Ok(server_name) =
             rustls::ServerName::try_from(adresses[0].ip().to_string().as_ref())
         {
             server_name
         } else {
-            error(element, "Invaild url");
-            return;
+            return Err(error(element, "Invaild url"));
         };
 
         logger.info("Tls setup success!");
@@ -107,8 +98,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     }
 
     let Some(mut conn) = conn else{
-        error(element, "Error: cannot connect to host!");
-        return;
+        return Err(error(element, "Error: cannot connect to host!"));
     };
 
     let send = format!(
@@ -121,16 +111,14 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     let send = send.as_bytes();
 
     let Ok(size) = conn.write(send) else{
-        error(element, "Error: Connection faild!");
-        return;
+        return Err(error(element, "Error: Connection faild!"));
     };
 
     if size != send.len() {
-        error(
+        return Err(error(
             element,
             "Error: Cannot write to connection, that means that the url or port is invalid!",
-        );
-        return;
+        ));
     }
 
     logger.info(format!("Headers: {:?}", headers));
@@ -139,8 +127,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
         let send = format!("{}: {}\r\n", header.0, header.1);
         let send = send.as_bytes();
         let Ok(_) = conn.write_all(send)else{
-            error(element, "Error: Connection faild!");
-            return;
+            return Err(error(element, "Error: Connection faild!"));
         };
     }
 
@@ -159,8 +146,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
 
         if let Err(err) = res {
             logger.error("Cannot Send Contelt-Length header!");
-            error(element, err.to_string());
-            return;
+            return Err(error(element, err.to_string()));
         }
     }
     conn.write_all(b"\r\n\r\n").unwrap();
@@ -225,8 +211,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
                 Err(err) => match err.kind() {
                     std::io::ErrorKind::WouldBlock => {}
                     _ => {
-                        error(element, format!("Error: {:?}", err));
-                        return;
+                        return Err(error(element, format!("Error: {:?}", err)));
                     }
                 },
             }
@@ -236,11 +221,10 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
         logger.info(format!("Response Headers: {:?}", headers));
 
         if status != 200 {
-            error(
+            return Err(error(
                 element,
                 format!("Http Error: status: {} {}", status, status_str),
-            );
-            return;
+            ));
         }
 
         let content_length;
@@ -248,8 +232,7 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
             if let Ok(cl) = data.trim().parse::<usize>() {
                 content_length = cl;
             } else {
-                error(element, "Error: Cannot parse Content-Length");
-                return;
+                return Err(error(element, "Error: Cannot parse Content-Length"));
             }
         } else {
             logger.info("No Content Length finded!");
@@ -268,16 +251,17 @@ pub fn creating_connection(element: &ERow, storage: &mut Storage) {
     }
 
     storage.set(conn);
-    element.set_status(4)
+    element.set_status(4);
+    Ok(())
 }
 
-pub fn get_method(element: &ERow) -> Option<String> {
+pub fn get_method(element: &ERow) -> Result<String, SessionError> {
     let error_i: u8;
 
     if let Some(method) = element.read().unwrap().element_data.get("method") {
         if let Type::CustomEnum(method) = method {
             if let Some(selected) = method.get_active() {
-                return Some(selected);
+                return Ok(selected);
             } else {
                 error_i = 2;
             }
@@ -288,7 +272,7 @@ pub fn get_method(element: &ERow) -> Option<String> {
         error_i = 0;
     }
 
-    error(
+    return Err(error(
         element,
         match error_i {
             0 => "Error: has no method!",
@@ -296,9 +280,7 @@ pub fn get_method(element: &ERow) -> Option<String> {
             2 => "Error: method has noting selected!",
             _ => "IDK",
         },
-    );
-
-    None
+    ));
 }
 
 pub fn get_headers(element: &ERow) -> HashMap<String, String> {
@@ -310,12 +292,12 @@ pub fn get_headers(element: &ERow) -> HashMap<String, String> {
     headers
 }
 
-pub fn get_port(element: &ERow) -> Option<u16> {
+pub fn get_port(element: &ERow) -> Result<u16, SessionError> {
     let error_i: u8;
 
     if let Some(data) = element.read().unwrap().element_data.get("port") {
         if let Type::U16(port) = data {
-            return Some(*port);
+            return Ok(*port);
         } else {
             error_i = 1;
         }
@@ -323,14 +305,12 @@ pub fn get_port(element: &ERow) -> Option<u16> {
         error_i = 0;
     }
 
-    error(
+    Err(error(
         element,
         match error_i {
             0 => "Error: has no port",
             1 => "Error: port should be u8",
             _ => "IDK",
         },
-    );
-
-    None
+    ))
 }

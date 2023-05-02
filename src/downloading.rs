@@ -4,7 +4,7 @@ use muzzman_lib::prelude::*;
 
 use crate::{connection::Connection, error};
 
-pub fn downloading(element: &ERow, storage: &mut Storage) {
+pub fn downloading(element: &ERow, storage: &mut Storage) -> Result<(), SessionError> {
     let mut logger = element.get_logger(None);
 
     let mut content_length: usize = 0;
@@ -28,7 +28,7 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
 
         {
             let Some(conn) = storage.get_mut::<Connection>()else{
-                return;
+                return Ok(());
             };
 
             match conn.read(&mut buffer) {
@@ -38,9 +38,9 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
                 Err(err) => {
                     match err.kind() {
                         std::io::ErrorKind::WouldBlock => {}
-                        _ => error(element, "Error: Connection close unexpected!"),
+                        _ => return Err(error(element, "Error: Connection close unexpected!")),
                     }
-                    return;
+                    return Ok(());
                 }
             }
         }
@@ -83,4 +83,6 @@ pub fn downloading(element: &ERow, storage: &mut Storage) {
             element.set_status(8);
         }
     }
+
+    Ok(())
 }

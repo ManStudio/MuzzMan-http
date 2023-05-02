@@ -323,17 +323,17 @@ impl TModule for ModuleHttp {
                 element_row.set_status(1);
             }
             1 => {
-                creating_connection(&element_row, storage);
+                creating_connection(&element_row, storage)?;
             }
             2 => {
                 // Change module
                 todo!()
             }
             3 => {
-                downloading(&element_row, storage);
+                downloading(&element_row, storage)?;
             }
             4 => {
-                uploading(&element_row, storage);
+                uploading(&element_row, storage)?;
             }
             5 => { // Paused
             }
@@ -414,12 +414,13 @@ impl TModule for ModuleHttp {
     }
 }
 
-pub fn error(element: &ERow, error: impl Into<String>) {
+pub fn error(element: &ERow, error: impl Into<String>) -> SessionError {
     let error = error.into();
     {
         let mut logger = element.get_logger(None);
         logger.error(error.clone())
     }
-    element.write().unwrap().statuses[9] = error;
+    element.write().unwrap().statuses[9] = error.clone();
     element.set_status(9);
+    SessionError::Custom(error)
 }

@@ -4,7 +4,7 @@ use muzzman_lib::prelude::*;
 
 use crate::{connection::Connection, error};
 
-pub fn uploading(element: &ERow, storage: &mut Storage) {
+pub fn uploading(element: &ERow, storage: &mut Storage) -> Result<(), SessionError> {
     let mut logger = element.get_logger(None);
 
     let mut sent = 0;
@@ -12,13 +12,9 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
         sent = *ptr;
     }
 
-    let Some(mut buffer_size) = get_buffer_size(element) else{
-        return;
-    };
+    let mut buffer_size = get_buffer_size(element)?;
 
-    let Some(content_length) = get_upload_content_length(element)else{
-        return;
-    };
+    let content_length = get_upload_content_length(element)?;
 
     if buffer_size + sent > content_length {
         buffer_size = content_length - sent;
@@ -38,7 +34,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
         let _res = conn.write(&bytes[0..add]);
     } else {
         element.set_status(1);
-        return;
+        return Ok(());
     }
 
     sent += add;
@@ -52,14 +48,15 @@ pub fn uploading(element: &ERow, storage: &mut Storage) {
     if add == 0 {
         element.set_status(3);
     }
+    Ok(())
 }
 
-pub fn get_buffer_size(element: &ERow) -> Option<usize> {
+pub fn get_buffer_size(element: &ERow) -> Result<usize, SessionError> {
     let error_i;
 
     if let Some(buffer_size) = element.read().unwrap().settings.get("buffer_size") {
         if let Type::USize(buffer_size) = buffer_size {
-            return Some(*buffer_size);
+            return Ok(*buffer_size);
         } else {
             error_i = 1;
         }
@@ -67,18 +64,17 @@ pub fn get_buffer_size(element: &ERow) -> Option<usize> {
         error_i = 0;
     }
 
-    error(
+    Err(error(
         element,
         match error_i {
             0 => "Error: module data has no `buffer_size`, you should add at module data a attribute named `buffer_usize` with time usize!",
             1 => "Error: module data `buffer_size` is not usize!",
             _ => "IDK",
         },
-    );
-    None
+    ))
 }
 
-fn get_upload_content_length(element: &ERow) -> Option<usize> {
+fn get_upload_content_length(element: &ERow) -> Result<usize, SessionError> {
     let error_i;
 
     if let Some(content_length) = element
@@ -88,7 +84,7 @@ fn get_upload_content_length(element: &ERow) -> Option<usize> {
         .get("upload-content-length")
     {
         if let Type::USize(content_length) = content_length {
-            return Some(*content_length);
+            return Ok(*content_length);
         } else {
             error_i = 1;
         }
@@ -96,13 +92,12 @@ fn get_upload_content_length(element: &ERow) -> Option<usize> {
         error_i = 0;
     }
 
-    error(
+    Err(error(
         element,
         match error_i {
             0 => "Error: element data has no `upload-content-length`",
             1 => "Error: element data `upload-content-length` is not usize",
             _ => "IDK",
         },
-    );
-    None
+    ))
 }
