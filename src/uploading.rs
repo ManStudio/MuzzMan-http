@@ -5,8 +5,6 @@ use muzzman_lib::prelude::*;
 use crate::{connection::Connection, error};
 
 pub fn uploading(element: &ERow, storage: &mut Storage) -> Result<(), SessionError> {
-    let mut logger = element.get_logger(None);
-
     let mut sent = 0;
     if let Some(Type::USize(ptr)) = element.read().unwrap().settings.get("sent") {
         sent = *ptr;
@@ -20,8 +18,8 @@ pub fn uploading(element: &ERow, storage: &mut Storage) -> Result<(), SessionErr
         buffer_size = content_length - sent;
     }
 
-    logger.info(format!("Sent: {}", sent));
-    logger.info(format!("Buffer size: {}", buffer_size));
+    log::info!("Sent: {}", sent);
+    log::info!("Buffer size: {}", buffer_size);
 
     let mut bytes = vec![0; buffer_size];
     let mut add = 0;
@@ -43,7 +41,7 @@ pub fn uploading(element: &ERow, storage: &mut Storage) -> Result<(), SessionErr
         *ptr = sent;
     }
 
-    logger.info(format!("New sent: {}", sent));
+    log::info!("New sent: {}", sent);
 
     if add == 0 {
         element.set_status(3);

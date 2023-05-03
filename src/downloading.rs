@@ -5,8 +5,6 @@ use muzzman_lib::prelude::*;
 use crate::{connection::Connection, error};
 
 pub fn downloading(element: &ERow, storage: &mut Storage) -> Result<(), SessionError> {
-    let mut logger = element.get_logger(None);
-
     let mut content_length: usize = 0;
     if let Some(Type::USize(data)) = element
         .read()
@@ -59,7 +57,7 @@ pub fn downloading(element: &ERow, storage: &mut Storage) -> Result<(), SessionE
             element.settings.set("recv", Type::USize(len));
         }
 
-        logger.info(format!("Recived: {}", recived));
+        log::info!("Recived: {}", recived);
 
         element
             .write()

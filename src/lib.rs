@@ -417,8 +417,7 @@ impl TModule for ModuleHttp {
 pub fn error(element: &ERow, error: impl Into<String>) -> SessionError {
     let error = error.into();
     {
-        let mut logger = element.get_logger(None);
-        logger.error(error.clone())
+        log::error!("{error}")
     }
     element.write().unwrap().statuses[9] = error.clone();
     element.set_status(9);

@@ -19,6 +19,7 @@ codegen-units = 128
 crate-type = ["cdylib"]
 
 [dependencies]
+log = { version = "0.4.17", features = ["std"] }
 # muzzman-lib = "0.3.2" 
 muzzman-lib = {path = "../../muzzman-lib"}
 rustls = "0.20.7"
