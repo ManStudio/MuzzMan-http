@@ -57,8 +57,6 @@ pub fn downloading(element: &ERow, storage: &mut Storage) -> Result<(), SessionE
             element.settings.set("recv", Type::USize(len));
         }
 
-        log::info!("Recived: {}", recived);
-
         element
             .write()
             .unwrap()

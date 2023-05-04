@@ -41,6 +41,7 @@ pub fn action_download(info: MRef, values: Vec<Type>) {
 
 impl TModule for ModuleHttp {
     fn init(&self, module_ref: MRef) -> Result<(), SessionError> {
+        logger::init();
         let _ = module_ref.register_action(
             String::from("download"),
             vec![
@@ -61,6 +62,7 @@ impl TModule for ModuleHttp {
             ],
             action_download,
         );
+        log::info!("Http module was loaded!");
         Ok(())
     }
 
